@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+#
+# EXECUTE WITH: 
+# chmod +x vila_setup_and_dryrun.sh
+# ./vila_setup_and_dryrun.sh
+
+# Complete environment bootstrap + single-GPU dry-run for NVILA-Lite
+# Tested on Ubuntu-22.04 under WSL 2 with an 8-GB RTX-series GPU.
+
+set -e          # exit on first error
+set -o pipefail # fail a pipeline if any step fails
+
+#####----- USER-TUNEABLE VARIABLES --------------------------------------------
+CONDA_ENV=vila-env         # new conda environment name
+PYTHON_VERSION=3.10        # use 3.10 because VILA/DeepSpeed tested there
+CUDA_VERSION=11.8          # match your WSL driver (nvidia-smi shows it)
+MODEL_CHECKPOINT="facebook/llama-7b"   # lighter than Qwen2-VL-7B
+VISION_TOWER="openai/clip-vit-base-patch32"  # light vision encoder
+PROJECT_ROOT=$HOME/VILA    # where to clone the repo
+DRYRUN_OUTPUT=runs/train/debug-cc3m-small
+#####--------------------------------------------------------------------------
+
+echo "================================================================="
+echo "1.  Refresh apt and install build tools"
+echo "-----------------------------------------------------------------"
+sudo apt-get update -qq
+sudo apt-get install -y git build-essential ninja-build wget curl
+
+echo "================================================================="
+echo "2.  Install / activate Miniconda environment"
+echo "-----------------------------------------------------------------"
+if ! command -v conda &>/dev/null; then
+  echo "ERROR: conda not found. Install Miniconda before running this script."
+  exit 1
+fi
+
+# Create environment only if it doesn’t exist
+if ! conda env list | grep -q "^$CONDA_ENV"; then
+  conda create -y -n "$CONDA_ENV" python=$PYTHON_VERSION
+fi
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate "$CONDA_ENV"
+
+echo "================================================================="
+echo "3.  Install PyTorch + CUDA $CUDA_VERSION and core libraries"
+echo "-----------------------------------------------------------------"
+pip install --upgrade pip
+pip install "torch==2.1.2+cu118" "torchvision==0.16.2+cu118" \
+            "torchaudio==2.1.2+cu118" --index-url https://download.pytorch.org/whl/cu118
+pip install deepspeed==0.12.6 accelerate transformers==4.39.3 \
+            sentencepiece ninja tqdm
+
+echo "================================================================="
+echo "4.  Clone VILA repo and patch single-GPU align script"
+echo "-----------------------------------------------------------------"
+git clone --depth 1 https://github.com/NVlabs/VILA.git "$PROJECT_ROOT" || true
+cd "$PROJECT_ROOT"
+
+cat > scripts/NVILA-Lite/align_single_gpu.sh <<'EOS'
+#!/usr/bin/env bash
+# Minimal single-GPU debug run (FP16, micro-batch 1)
+
+export CUDA_VISIBLE_DEVICES=0
+export GPUS_PER_NODE=1
+export DS_NPROC_PER_NODE=1
+
+export GLOBAL_TRAIN_BATCH_SIZE=1
+export PER_DEVICE_TRAIN_BATCH_SIZE=1
+export GRADIENT_ACCUMULATION_STEPS=1
+export FP16=True
+
+export DATA_MIXTURE=${DATA_MIXTURE:-debug_cc3m}
+STAGE_PATH=${1:-"'"$MODEL_CHECKPOINT"'"}
+OUTPUT_DIR=${2:-"'"$DRYRUN_OUTPUT"'"}
+
+source scripts/setups/train.sh
+
+torchrun \
+  --nnodes=$NNODES \
+  --nproc_per_node=$GPUS_PER_NODE \
+  --node_rank=$NODE_RANK \
+  --master_addr=$MASTER_ADDR \
+  --master_port=$MASTER_PORT \
+  llava/train/train_mem.py \
+  --deepspeed scripts/zero3.json \
+  --model_name_or_path $STAGE_PATH \
+  --chat_template qwen2 \
+  --data_mixture $DATA_MIXTURE \
+  --vision_tower '"$VISION_TOWER"' \
+  --mm_vision_select_feature cls_patch \
+  --mm_projector mlp_downsample_3x3_fix \
+  --tune_vision_tower False \
+  --tune_mm_projector True \
+  --tune_language_model False \
+  --fp16 True \
+  --output_dir $OUTPUT_DIR/model \
+  --num_train_epochs 1 \
+  --per_device_train_batch_size $PER_DEVICE_TRAIN_BATCH_SIZE \
+  --gradient_accumulation_steps $GRADIENT_ACCUMULATION_STEPS \
+  --evaluation_strategy no \
+  --save_strategy no \
+  --learning_rate 1e-3 \
+  --weight_decay 0.0 \
+  --logging_steps 1 \
+  --model_max_length 1024 \
+  --gradient_checkpointing True \
+  --report_to none
+EOS
+chmod +x scripts/NVILA-Lite/align_single_gpu.sh
+
+echo "================================================================="
+echo "5.  Patch DeepSpeed zero3.json for CPU offload"
+echo "-----------------------------------------------------------------"
+jq '.zero_optimization.offload_param.device="cpu" |
+    .zero_optimization.offload_optimizer.device="cpu" |
+    .zero_optimization.stage=3' \
+    scripts/zero3.json | sponge scripts/zero3.json
+
+echo "================================================================="
+echo "6.  Dry-run start (should compile custom ops the first time)"
+echo "-----------------------------------------------------------------"
+DATA_MIXTURE=debug_cc3m bash scripts/NVILA-Lite/align_single_gpu.sh
+
