@@ -3,17 +3,18 @@ NOTE: The Script's purpose is to set up VILA and perform a dry run restircted to
 
 # Pre-Installation Checklist:
 
-1.	Enable WSL 2
-Run these lines in PowerShell as an administrator:
-wsl --install
-wsl --set-default-version 2
+1.	Enable WSL 2 by running these lines in PowerShell as an administrator:
+
+      wsl --install
+
+      wsl --set-default-version 2
 
 2.	Install Ubuntu 22.04 (or 20.04) from Microsoft Store and open it at least once to finish initialization.
 
 3.	Install the combined NVIDIA driver for Windows + WSL
 Download from NVIDIA → “CUDA on WSL” package. 
 
-      Run: nvidia-smi inside WSL should show your GPU and CUDA version.
+      Run _nvidia-smi_ inside WSL, it should show your GPU and CUDA version.
 
 4.	Install Miniconda inside WSL:
 
