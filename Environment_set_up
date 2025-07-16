@@ -20,10 +20,6 @@ bash path/to/script.sh
 
 #!/usr/bin/env bash
 #
-# EXECUTE WITH: 
-# chmod +x vila_setup_and_dryrun.sh
-# ./vila_setup_and_dryrun.sh
-
 # Complete environment bootstrap + single-GPU dry-run for NVILA-Lite
 # Tested on Ubuntu-22.04 under WSL 2 with an 8-GB RTX-series GPU.
 
