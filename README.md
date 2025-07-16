@@ -1,7 +1,7 @@
 NOTE: The Script's purpose is to set up VILA and perform a dry run restircted to one GPU.
       If you have more than one GPU you may adjust the align.sh & Train.sh scripts as needed
 
-Pre-Installation Checklist:
+# Pre-Installation Checklist:
 
 1.	Enable WSL 2
 Run these lines in PowerShell as an administrator:
@@ -17,7 +17,7 @@ Run: nvidia-smi inside WSL should show your GPU and CUDA version.
 4.	Install Miniconda inside WSL
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
-# allow it to add conda to ~/.bashrc
+Allow it to add conda to ~/.bashrc
 
 Once all the required software are installed, save and run the script stored in Environment_set_up to:
 -	Refresh apt and install build tools
