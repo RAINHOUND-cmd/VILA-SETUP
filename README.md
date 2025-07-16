@@ -12,12 +12,15 @@ wsl --set-default-version 2
 
 3.	Install the combined NVIDIA driver for Windows + WSL
 Download from NVIDIA → “CUDA on WSL” package. 
-Run: nvidia-smi inside WSL should show your GPU and CUDA version.
 
-4.	Install Miniconda inside WSL
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh
-Allow it to add conda to ~/.bashrc
+      Run: nvidia-smi inside WSL should show your GPU and CUDA version.
+
+4.	Install Miniconda inside WSL:
+
+      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      bash Miniconda3-latest-Linux-x86_64.sh
+
+      Allow it to add conda to ~/.bashrc
 
 Once all the required software are installed, save and run the script stored in Environment_set_up to:
 -	Refresh apt and install build tools
