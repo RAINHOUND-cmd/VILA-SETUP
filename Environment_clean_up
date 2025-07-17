@@ -1,0 +1,47 @@
+--WSL--
+
+#!/bin/bash
+
+echo "==> Running general system cleanup..."
+
+# Clean apt cache and auto-remove unused packages
+sudo apt clean
+sudo apt autoclean
+sudo apt autoremove -y
+
+# Remove all user cache
+rm -rf ~/.cache/*
+
+# Remove GNOME/KDE thumbnail cache
+rm -rf ~/.cache/thumbnails/*
+
+# Remove files in system temp directories
+sudo rm -rf /tmp/*
+sudo rm -rf /var/tmp/*
+
+# Clear memory page cache
+echo "==> Flushing kernel memory caches..."
+sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
+# Clear swap, if present
+if swapon --show | grep -q "/" ; then
+    echo "==> Flushing swap..."
+    sudo swapoff -a && sudo swapon -a
+fi
+
+# Clean pip cache, if pip is installed
+if command -v pip >/dev/null 2>&1; then
+  echo "==> Cleaning pip cache..."
+  pip cache purge
+fi
+
+# Docker system prune, if docker is installed
+if command -v docker >/dev/null 2>&1; then
+  echo "==> Pruning unused Docker containers/images..."
+  docker system prune -a -f
+fi
+
+echo "==> WSL cleanup complete!"
+echo "To reclaim disk space in WSL2, shutdown WSL and compact the .vhdx from Windows PowerShell:"
+echo "  wsl --shutdown"
+echo "  Optimize-VHD -Path 'C:\\Users\\<YourUser>\\AppData\\Local\\Packages\\<Distro>\\LocalState\\ext4.vhdx' -Mode Full"
